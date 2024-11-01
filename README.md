@@ -36,20 +36,20 @@ For the signature value **s** to be short (have certain amount of leading zero b
 
 Since comparison operators are not defined over a finite field (and calculation of **s** is done in the finite field modulo field order **n**), we can create a set of all the integers 0..(2^247-1) and then see if the s value is contained in this set, therefore we can write
 
-**s** ∈ {i ∈ Z | i < 2^247}
+**s** ∈ {i ∈ Z | i < 2^247}\
 **k**^-1\*(**z**+**dr**) ∈ {i ∈ Z | i < 2^247}
 
 **k** is 1/2 so the inverse is 2, and we can also let **x**=-**dr** mod **n**, since **d** is a constant private key and **r** is also a constant since we use a constant **k** (the minus sign will become apparent later).
 
-2\*(**z**-**x**) ∈ {i ∈ Z | i < 2^247}
+2\*(**z**-**x**) ∈ {i ∈ Z | i < 2^247}\
 (**z**-**x**) ∈ {i/2 | i < 2^247}
 
 Which we can write as (keep in mind i/2 is division in the finite field)
 
-(**z**-**x**) ∈ {i ∈ Z | i < 2^246} ∪ {i ∈ Z | **n** div 2 + 1 ≤ i < **n** div 2 + 1 + 2^246}, where div is integer division
+(**z**-**x**) ∈ {i ∈ Z | i < 2^246} ∪ {i ∈ Z | **n** div 2 + 1 ≤ i < **n** div 2 + 1 + 2^246}, where div is integer division\
 **z** ∈ {i + **x** mod **n**| i < 2^246} ∪ {i + **x** mod **n** | **n** div 2 + 1 ≤ i < **n** div 2 + 1 + 2^246}
 
-**I(x)** = {i + **x** mod **n**| i < 2^246} ∪ {i + **x** mod **n** | **n** div 2 + 1 ≤ i < **n** div 2 + 1 + 2^246}
+**I(x)** = {i + **x** mod **n**| i < 2^246} ∪ {i + **x** mod **n** | **n** div 2 + 1 ≤ i < **n** div 2 + 1 + 2^246}\
 **z** ∈ **I(x)**
 
 This complicated-looking interval can be easily represented on the finite field circle
@@ -62,10 +62,10 @@ What this shows is that the signature's s-value having at least 1 leading zero b
 
 By using 2 private keys, and requiring that the miner produces short signatures for both of them over a single transaction hash we can make sure that the transaction hash is included in both of the intervals, or in other words the transaction hash is in the intersection of the 2 intervals.
 
-Let **d1**, **d2** be the private keys, then **x1**=-**d1**\***r** and **x2**=-**d2**\***r**.
-**z** ∈ **I(x1)**
-**z** ∈ **I(x2)**
-**C(x1, x2)** = **I(x1)** ∩ **I(x2)**
+Let **d1**, **d2** be the private keys, then **x1**=-**d1**\***r** and **x2**=-**d2**\***r**.\
+**z** ∈ **I(x1)**\
+**z** ∈ **I(x2)**\
+**C(x1, x2)** = **I(x1)** ∩ **I(x2)**\
 **z** ∈ **C(x1, x2)**
 
 !(FF circle two keys)[]
@@ -82,11 +82,11 @@ We will use a mix of overlapping & non-overlapping intervals to force the miner 
 
 Let ∆x be a pre-selected offset between private key **x** values defining the difficulty of the PoW output, we will create a set of 6 pairs of private keys (here represented by their corresponding **x** value, one can simply calculate private key **d**=-**x**/**r** mod **n**), where private keys in pair have an overlap defined by ∆x and different pairs have no overlap.
 
-(x1a, x1b) = (1, 1 + ∆x)
-(x2a, x2b) = (2^248 + 1, 2^248 + 1 + ∆x)
-(x3a, x3b) = (2\*2^248 + 1, 2\*2^248 + 1 + ∆x)
-(x4a, x4b) = (3\*2^248 + 1, 3\*2^248 + 1 + ∆x)
-(x5a, x5b) = (4\*2^248 + 1, 4\*2^248 + 1 + ∆x)
+(x1a, x1b) = (1, 1 + ∆x)\
+(x2a, x2b) = (2^248 + 1, 2^248 + 1 + ∆x)\
+(x3a, x3b) = (2\*2^248 + 1, 2\*2^248 + 1 + ∆x)\
+(x4a, x4b) = (3\*2^248 + 1, 3\*2^248 + 1 + ∆x)\
+(x5a, x5b) = (4\*2^248 + 1, 4\*2^248 + 1 + ∆x)\
 (x6a, x6b) = (5\*2^248 + 1, 5\*2^248 + 1 + ∆x)
 
 This forces the miner to use a different sighash flag for every one of the 6 intervals defined by overlapping interval private key pairs, ensuring that our need for both signatures to use the same transaction hash for overlapping intervals holds.
@@ -111,13 +111,13 @@ Therefore the optimal way to produce all the required hashes/signatures is as fo
 
 We can therefore express the total work that needs to be done by a miner as **Wt(∆x)** = **W(∆x)**/6 + 2\***W(∆x)**/5+ **W(∆x)**^2/4\*3 + **W(∆x)**^2/2. Based on this equation we can derive an equation for calculating **∆x** from the required work **Wt**.
 
-**Wt(∆x)** = **W(∆x)**/6 + 2\***W(∆x)**/5 + **W(∆x)**^2/4\*3 + **W(∆x)**^2/2
-**Wt(∆x)** = 17/30\***W(∆x)** + 7/12\***W(∆x)**^2
+**Wt(∆x)** = **W(∆x)**/6 + 2\***W(∆x)**/5 + **W(∆x)**^2/4\*3 + **W(∆x)**^2/2\
+**Wt(∆x)** = 17/30\***W(∆x)** + 7/12\***W(∆x)**^2\
 0 = 7/12\***W(∆x)**^2 + 17/30\***W(∆x)** - **Wt(∆x)**
 
-**W(∆x)** = (-17/30 + sqrt(289/900 + 7/3\***Wt(∆x)**))/(7/6)
-**W(∆x)** = 1/105*(3\*sqrt(289+2100\***Wt(∆x)**) - 51)
-**n**/(2^248-2**∆x**) = 1/105*(3\*sqrt(289+2100\***Wt(∆x)**) - 51)
+**W(∆x)** = (-17/30 + sqrt(289/900 + 7/3\***Wt(∆x)**))/(7/6)\
+**W(∆x)** = 1/105*(3\*sqrt(289+2100\***Wt(∆x)**) - 51)\
+**n**/(2^248-2**∆x**) = 1/105*(3\*sqrt(289+2100\***Wt(∆x)**) - 51)\
 2^247-2**∆x** = 105**n**/(3\*sqrt(289+2100\***Wt(∆x)**) - 51)
 
 **∆x** = 105**n**/(102 - 6\*sqrt(289+2100\***Wt(∆x)**)) + 2^246
@@ -126,35 +126,35 @@ We can therefore express the total work that needs to be done by a miner as **Wt
 
 A simple example for constructing an output with a difficulty of 160000 (a miner on average has to go through 160000 hashes to find a solution) - all numbers are in hexadecimal.
 
-Field order **n** = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
-Required work **Wt** = 0x27100
+Field order **n** = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141\
+Required work **Wt** = 0x27100\
 **∆x** = 0x00015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f3
 
 Interval pairs (**x** values)
 
-(x1a, x1b) = (0x0000000000000000000000000000000000000000000000000000000000000001, 0x00015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)
-(x2a, x2b) = (0x0100000000000000000000000000000000000000000000000000000000000001, 0x01015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)
-(x3a, x3b) = (0x0200000000000000000000000000000000000000000000000000000000000001, 0x02015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)
-(x4a, x4b) = (0x0300000000000000000000000000000000000000000000000000000000000001, 0x03015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)
-(x5a, x5b) = (0x0400000000000000000000000000000000000000000000000000000000000001, 0x04015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)
+(x1a, x1b) = (0x0000000000000000000000000000000000000000000000000000000000000001, 0x00015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
+(x2a, x2b) = (0x0100000000000000000000000000000000000000000000000000000000000001, 0x01015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
+(x3a, x3b) = (0x0200000000000000000000000000000000000000000000000000000000000001, 0x02015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
+(x4a, x4b) = (0x0300000000000000000000000000000000000000000000000000000000000001, 0x03015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
+(x5a, x5b) = (0x0400000000000000000000000000000000000000000000000000000000000001, 0x04015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
 (x6a, x6b) = (0x0500000000000000000000000000000000000000000000000000000000000001, 0x05015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)
 
 Derive private key pairs from the **x** value pairs, **d**=-**x**/**r** mod **n**
 
-(d1a, d1b) = (0x714c150e7cc990721378a2c2e5793c970352349ca849e07402b70a634efca6fd, 0xd7005728a9b90a68b9ea263c23eae65cf179843bac9aefe930a851780f1c1e32)
-(d2a, d2b) = (0x55bbf0ee65ba65767b8ce233c711b1fcae7c097ac42a5977ba1876c7ce530395, 0xbb70330892a9df6d21fe65ad05835bc29ca35919c87b68ece809bddc8e727aca)
-(d3a, d3b) = (0x3a2bccce4eab3a7ae3a121a4a8aa276259a5de58e00ad27b7179e32c4da9602d, 0x9fe00ee87b9ab4718a12a51de71bd12847cd2df7e45be1f09f6b2a410dc8d762)
-(d4a, d4b) = (0x1e9ba8ae379c0f7f4bb561158a429cc804cfb336fbeb4b7f28db4f90ccffbcc5, 0x844feac8648b8975f226e48ec8b4468df2f702d6003c5af456cc96a58d1f33fa)
-(d5a, d5b) = (0x030b848e208ce483b3c9a0866bdb122daff9881517cbc482e03cbbf54c56195d, 0x68bfc6a84d7c5e7a5a3b23ffaa4cbbf39e20d7b41c1cd3f80e2e030a0c759092)
+(d1a, d1b) = (0x714c150e7cc990721378a2c2e5793c970352349ca849e07402b70a634efca6fd, 0xd7005728a9b90a68b9ea263c23eae65cf179843bac9aefe930a851780f1c1e32)\
+(d2a, d2b) = (0x55bbf0ee65ba65767b8ce233c711b1fcae7c097ac42a5977ba1876c7ce530395, 0xbb70330892a9df6d21fe65ad05835bc29ca35919c87b68ece809bddc8e727aca)\
+(d3a, d3b) = (0x3a2bccce4eab3a7ae3a121a4a8aa276259a5de58e00ad27b7179e32c4da9602d, 0x9fe00ee87b9ab4718a12a51de71bd12847cd2df7e45be1f09f6b2a410dc8d762)\
+(d4a, d4b) = (0x1e9ba8ae379c0f7f4bb561158a429cc804cfb336fbeb4b7f28db4f90ccffbcc5, 0x844feac8648b8975f226e48ec8b4468df2f702d6003c5af456cc96a58d1f33fa)\
+(d5a, d5b) = (0x030b848e208ce483b3c9a0866bdb122daff9881517cbc482e03cbbf54c56195d, 0x68bfc6a84d7c5e7a5a3b23ffaa4cbbf39e20d7b41c1cd3f80e2e030a0c759092)\
 (d6a, d6b) = (0xe77b606e097db9881bdddff74d73879215d239d9e2f4ddc2577086e69be2b736, 0x4d2fa288366d337ec24f63708be53159494aac9237fd4cfbc58f6f6e8bcbed2a)
 
 Finally derive public keys from the private key pairs, **P**=**d**\*G, here the public keys are expressed in their compressed form.
 
-(P1a, P1b) = (02f8f1e55f7349f7ab27c078a916ec02e055164fc7e69fc23e402fa9809acfd4f4, 03f90506c9d6bc07e3afe49e32e9706afd2f5d7ece6ae575d02ea8890ddb3063e6)
-(P2a, P2b) = (037309a5ba25f35a9fac04bba70ff53fad7e571b204fae5b15823d2043536b874e, 02a1f2ad58db44ff014bc13ab0da22c3f81ac2c9669d1ff0b2c859787f192452f9)
-(P3a, P3b) = (02df8c2213cd1e506a71188075614630380cefb5e1f4ae403ce43a0c55eb3666f3, 02db49be37690b7352fa3e15d67cd4acdeea20b871caa50370c3916948c3faa0c4)
-(P4a, P4b) = (03a4dc09a46077c7f58be8a70a9bff31637b58a94ebbe85215449da0f647be90b0, 0397b292e2720f16b8ad94551d161b2b8fa38cd39de37cb55a77302275bbfe4b25)
-(P5a, P5b) = (02dada669eeafb333374f467c3514f7b2dfcc57a67b659c2da4f989f53b4c71875, 02516c9a350512c50f6aa30efb6b8f47864df632a4a74c3f526ae8ad21fa0c128d)
+(P1a, P1b) = (02f8f1e55f7349f7ab27c078a916ec02e055164fc7e69fc23e402fa9809acfd4f4, 03f90506c9d6bc07e3afe49e32e9706afd2f5d7ece6ae575d02ea8890ddb3063e6)\
+(P2a, P2b) = (037309a5ba25f35a9fac04bba70ff53fad7e571b204fae5b15823d2043536b874e, 02a1f2ad58db44ff014bc13ab0da22c3f81ac2c9669d1ff0b2c859787f192452f9)\
+(P3a, P3b) = (02df8c2213cd1e506a71188075614630380cefb5e1f4ae403ce43a0c55eb3666f3, 02db49be37690b7352fa3e15d67cd4acdeea20b871caa50370c3916948c3faa0c4)\
+(P4a, P4b) = (03a4dc09a46077c7f58be8a70a9bff31637b58a94ebbe85215449da0f647be90b0, 0397b292e2720f16b8ad94551d161b2b8fa38cd39de37cb55a77302275bbfe4b25)\
+(P5a, P5b) = (02dada669eeafb333374f467c3514f7b2dfcc57a67b659c2da4f989f53b4c71875, 02516c9a350512c50f6aa30efb6b8f47864df632a4a74c3f526ae8ad21fa0c128d)\
 (P6a, P6b) = (035df4a0bb365ba44df94e9bd2f343111e17d74e26afbe525e9c629c967a53da6f, 0332b3bf3c3037286c7e6658cbccdc819432956c087b446b4c5db7080db611b802)
 
 Now we can create a locking script requiring that the signature sizes under all the public keys be of 59 bytes or less
