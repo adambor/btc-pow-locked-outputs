@@ -183,3 +183,7 @@ Mainnet transactions:
 1. PoW locked output initiated as output 0 of tx - [a9080e34c79ddec6fc430108cbea5f6a86dfc7fb6d04b7612cfd542548735229](https://mempool.space/tx/a9080e34c79ddec6fc430108cbea5f6a86dfc7fb6d04b7612cfd542548735229#vout=0)
 2. Intermediate transation whose output was used as input 1 of the claim transaction - [bec2ec7e08d28b2e59ab9a66d9f054292c093f9c0f7b170265eb1c9834c42c6f](https://mempool.space/tx/bec2ec7e08d28b2e59ab9a66d9f054292c093f9c0f7b170265eb1c9834c42c6f)
 3. Claim transaction - [2646b0f5633b45c5e2acb0eec639dea8da92d5d17a16fa9479ef988bede06d4a](https://mempool.space/tx/2646b0f5633b45c5e2acb0eec639dea8da92d5d17a16fa9479ef988bede06d4a)
+
+### Edge cases
+
+It might happen that in case the difficulty is high enough, the grinding for SIGHASH_NONE \| ANYONECANPAY couldn't find any valid solution by grinding the transaction locktime (around 1200000000 possibilities) & input 0's nSequence (around 2^31 possibilities with the most significant enable bit being 0 to ensure no consensus meaning) - in total around ~2^61 possibilities, in that case only other option is to start grinding transaction version, resulting in the total of ~2^93 possibilities - this will however make the transaction non-standard and it will have to be broadcasted directly to a miner to include it in the block. This is unlikely to happen anytime soon though, as even with the bitcoin's current block difficulty the chance of it happening is just ~1:10^8.
