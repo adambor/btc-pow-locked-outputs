@@ -54,7 +54,7 @@ Which we can write as (keep in mind i/2 is division in the finite field)
 
 This complicated-looking interval can be easily represented on the finite field circle
 
-!(FF circle single key)[]
+![FF circle single key](https://github.com/adambor/btc-pow-locked-outputs/blob/main/single-key-diagram.png)
 
 What this shows is that the signature's s-value having at least 1 leading zero byte depends on the transaction hash **z** being in some interval **I(x)**, which is a function of the constant **x**=-**dr** and therefore depends only on the choosen private key **d** (**r** is fixed, since **k**=1/2). Moreover the interval always has the size of 2^247 field elements - hence when requiring just 1 leading zero byte the chance that any **z** will be in the interval is 2^247/**n** (n ~ 2^256) ~ 0.2%.
 
@@ -68,7 +68,7 @@ Let **d1**, **d2** be the private keys, then **x1**=-**d1**\***r** and **x2**=-*
 **C(x1, x2)** = **I(x1)** ∩ **I(x2)**\
 **z** ∈ **C(x1, x2)**
 
-!(FF circle two keys)[]
+![FF circle two key](https://github.com/adambor/btc-pow-locked-outputs/blob/main/two-key-diagram.png)
 
 The interval **C(x1,x2)** can therefore be of aribtrary size, the size of **C** (how many element it contains) can be calculated as 2^247-2\*∆x, where ∆x = abs(x1-x2). The chance that any **z** will be in the interval is P(∆x) = (2^247-2\*∆x)/**n**, or in other words, the work required is W(∆x) = **n**/(2^247-2\*∆x). This way we can fine-tune the chance that any transaction hash **z** will be in the interval (produce short s-values for both private keys) and therefore adjust the amount of work required to satisfy the output script. We still need to make sure that the transaction hash **z** is the same for both signatures, since miner can use different sighashes, and in that case transaction hash for the 2 signatures is not the same.
 
@@ -90,6 +90,8 @@ Let ∆x be a pre-selected offset between private key **x** values defining the 
 (x6a, x6b) = (5\*2^248 + 1, 5\*2^248 + 1 + ∆x)
 
 This forces the miner to use a different sighash flag for every one of the 6 intervals defined by overlapping interval private key pairs, ensuring that our need for both signatures to use the same transaction hash for overlapping intervals holds.
+
+### Estimating difficulty
 
 A naive approach would be to say that the difficulty (work required) in this construction is (W(∆x)^6)/6! - as we need to hit 6 different transaction hashes **z** within a pre-specified intervals. It is important to note however that some sighashes can be independent of each other. Here is a table of bitcoin sighashes and their dependencies in a 2-input & 2-output bitcoin transaction:
 
@@ -121,6 +123,21 @@ We can therefore express the total work that needs to be done by a miner as **Wt
 2^247-2**∆x** = 105**n**/(3\*sqrt(289+2100\***Wt(∆x)**) - 51)
 
 **∆x** = 105**n**/(102 - 6\*sqrt(289+2100\***Wt(∆x)**)) + 2^246
+
+### Claim transaction structure
+
+The claim transaction needs to be carefully crafted as to not allow other miners to gain advantage from it.
+
+If the claim transaction is already published in the mempool, it makes it a bit easier to mine for others as they can re-use the short signatures for SIGHASH_NONE \| ANYONECANPAY, this is not signficant though, since grinding the SIGHASH_NONE \| ANYONECANPAY is the easiest (total work contribution is just **W(∆x)**/6, compared to e.g. **W(∆x)**^2/2 for both SIGHASH_ALL & ANYONECANPAY) - this is something we cannot eliminate.
+
+Other miners could also re-use SIGHASH_SINGLE \| ANYONECANPAY, but this would mean they cannot change the output 0 of the transaction, it is therefore required to put the most significant output (e.g. the payout output) as the first output of the transaction. Same applies for SIGHASH_ALL \| ANYONECANPAY, however this is already covered by just using the output 0 of the transaction as the most significant output.
+
+To prevent other miners from re-using non-ANYONECANPAY signatures, the input 1 of the transaction should be a P2WPKH utxo, signed with SIGHASH_ALL, changing the transaction in any way would therefore invalidate the signature of this input.
+
+| Inputs                                        | Outputs                                 |
+|-----------------------------------------------|-----------------------------------------|
+| input0: PoW-locked UTXO                       | output0: Most significant (e.g. payout) |
+| input1: P2WPKH UTXO (signed with SIGHASH_ALL) | output1: Insignificant (e.g. OP_RETURN) |
 
 ### Example
 
@@ -186,4 +203,11 @@ Mainnet transactions:
 
 ### Edge cases
 
+#### Not enough variety for SIGHASH_NONE \| ANYONECANPAY
+
 It might happen that in case the difficulty is high enough, the grinding for SIGHASH_NONE \| ANYONECANPAY couldn't find any valid solution by grinding the transaction locktime (around 1200000000 possibilities) & input 0's nSequence (around 2^31 possibilities with the most significant enable bit being 0 to ensure no consensus meaning) - in total around ~2^61 possibilities, in that case only other option is to start grinding transaction version, resulting in the total of ~2^93 possibilities - this will however make the transaction non-standard and it will have to be broadcasted directly to a miner to include it in the block. This is unlikely to happen anytime soon though, as even with the bitcoin's current block difficulty the chance of it happening is just ~1:10^8.
+
+### Improvements
+
+Miners can cache intermediary states of sha256 hash function when grinding just parts of the transaction to speed up the process, they can also cache sha256 hashes of outputs & inputs, respectively when changing the other.
+
