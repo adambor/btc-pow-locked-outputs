@@ -70,7 +70,7 @@ Let **d1**, **d2** be the private keys, then **x1**=-**d1**\***r** and **x2**=-*
 
 ![FF circle two key](https://github.com/adambor/btc-pow-locked-outputs/blob/main/two-key-diagram.png)
 
-The interval **C(x1,x2)** can therefore be of aribtrary size, the size of **C** (how many element it contains) can be calculated as 2^247-2\*∆x, where ∆x = abs(x1-x2). The chance that any **z** will be in the interval is P(∆x) = (2^247-2\*∆x)/**n**, or in other words, the work required is W(∆x) = **n**/(2^247-2\*∆x). This way we can fine-tune the chance that any transaction hash **z** will be in the interval (produce short s-values for both private keys) and therefore adjust the amount of work required to satisfy the output script. We still need to make sure that the transaction hash **z** is the same for both signatures, since miner can use different sighashes, and in that case transaction hash for the 2 signatures is not the same.
+The interval **C(x1,x2)** (dotted area on the circle) can therefore be of aribtrary size, the size of **C** (how many element it contains) can be calculated as 2^247-2\*∆x, where ∆x = abs(x1-x2). The chance that any **z** will be in the interval is P(∆x) = (2^247-2\*∆x)/**n**, or in other words, the work required is W(∆x) = **n**/(2^247-2\*∆x). This way we can fine-tune the chance that any transaction hash **z** will be in the interval (produce short s-values for both private keys) and therefore adjust the amount of work required to satisfy the output script. We still need to make sure that the transaction hash **z** is the same for both signatures, since miner can use different sighashes, and in that case transaction hash for the 2 signatures is not the same.
 
 ### Non-overlapping intervals
 
@@ -141,73 +141,72 @@ To prevent other miners from re-using non-ANYONECANPAY signatures, the input 1 o
 
 ### Example
 
-A simple example for constructing an output with a difficulty of 160000 (a miner on average has to go through 160000 hashes to find a solution) - all numbers are in hexadecimal.
+A simple example for constructing an output with a difficulty of 2^18 (a miner on average has to go through 262144 hashes to find a solution) - all numbers are in hexadecimal.
 
 Field order **n** = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141\
-Required work **Wt** = 0x27100\
-**∆x** = 0x00015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f3
+Required work **Wt** = 0x40000\
+**∆x** = 0x000f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc163
 
 Interval pairs (**x** values)
 
-(x1a, x1b) = (0x0000000000000000000000000000000000000000000000000000000000000001, 0x00015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
-(x2a, x2b) = (0x0100000000000000000000000000000000000000000000000000000000000001, 0x01015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
-(x3a, x3b) = (0x0200000000000000000000000000000000000000000000000000000000000001, 0x02015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
-(x4a, x4b) = (0x0300000000000000000000000000000000000000000000000000000000000001, 0x03015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
-(x5a, x5b) = (0x0400000000000000000000000000000000000000000000000000000000000001, 0x04015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)\
-(x6a, x6b) = (0x0500000000000000000000000000000000000000000000000000000000000001, 0x05015f9a749d2e73e31754c8929cfc59f891019b2f8781ddeaecc430d59916f4)
+(x1a, x1b) = (0x0000000000000000000000000000000000000000000000000000000000000001, 0x000f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164)\
+(x2a, x2b) = (0x0100000000000000000000000000000000000000000000000000000000000001, 0x010f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164)\
+(x3a, x3b) = (0x0200000000000000000000000000000000000000000000000000000000000001, 0x020f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164)\
+(x4a, x4b) = (0x0300000000000000000000000000000000000000000000000000000000000001, 0x030f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164)\
+(x5a, x5b) = (0x0400000000000000000000000000000000000000000000000000000000000001, 0x040f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164)\
+(x6a, x6b) = (0x0500000000000000000000000000000000000000000000000000000000000001, 0x050f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164)
 
 Derive private key pairs from the **x** value pairs, **d**=-**x**/**r** mod **n**
 
-(d1a, d1b) = (0x714c150e7cc990721378a2c2e5793c970352349ca849e07402b70a634efca6fd, 0xd7005728a9b90a68b9ea263c23eae65cf179843bac9aefe930a851780f1c1e32)\
-(d2a, d2b) = (0x55bbf0ee65ba65767b8ce233c711b1fcae7c097ac42a5977ba1876c7ce530395, 0xbb70330892a9df6d21fe65ad05835bc29ca35919c87b68ece809bddc8e727aca)\
-(d3a, d3b) = (0x3a2bccce4eab3a7ae3a121a4a8aa276259a5de58e00ad27b7179e32c4da9602d, 0x9fe00ee87b9ab4718a12a51de71bd12847cd2df7e45be1f09f6b2a410dc8d762)\
-(d4a, d4b) = (0x1e9ba8ae379c0f7f4bb561158a429cc804cfb336fbeb4b7f28db4f90ccffbcc5, 0x844feac8648b8975f226e48ec8b4468df2f702d6003c5af456cc96a58d1f33fa)\
-(d5a, d5b) = (0x030b848e208ce483b3c9a0866bdb122daff9881517cbc482e03cbbf54c56195d, 0x68bfc6a84d7c5e7a5a3b23ffaa4cbbf39e20d7b41c1cd3f80e2e030a0c759092)\
-(d6a, d6b) = (0xe77b606e097db9881bdddff74d73879215d239d9e2f4ddc2577086e69be2b736, 0x4d2fa288366d337ec24f63708be53159494aac9237fd4cfbc58f6f6e8bcbed2a)
+(d1a, d1b) = (0x714c150e7cc990721378a2c2e5793c970352349ca849e07402b70a634efca6fd, 0xa0cc0ae9058236ed8b9791845c0533cf2c8371f96ee9b9db36bfcdf3e6eb8cd6)\
+(d2a, d2b) = (0x55bbf0ee65ba65767b8ce233c711b1fcae7c097ac42a5977ba1876c7ce530395, 0x853be6c8ee730bf1f3abd0f53d9da934d7ad46d78aca32deee213a586641e96e)\
+(d3a, d3b) = (0x3a2bccce4eab3a7ae3a121a4a8aa276259a5de58e00ad27b7179e32c4da9602d, 0x69abc2a8d763e0f65bc010661f361e9a82d71bb5a6aaabe2a582a6bce5984606)\
+(d4a, d4b) = (0x1e9ba8ae379c0f7f4bb561158a429cc804cfb336fbeb4b7f28db4f90ccffbcc5, 0x4e1b9e88c054b5fac3d44fd700ce94002e00f093c28b24e65ce4132164eea29e)\
+(d5a, d5b) = (0x030b848e208ce483b3c9a0866bdb122daff9881517cbc482e03cbbf54c56195d, 0x328b7a68a9458aff2be88f47e2670965d92ac571de6b9dea14457f85e444ff36)\
+(d6a, d6b) = (0xe77b606e097db9881bdddff74d73879215d239d9e2f4ddc2577086e69be2b736, 0x16fb56489236600393fcceb8c3ff7ecb84549a4ffa4c16edcba6ebea639b5bce)
 
 Finally derive public keys from the private key pairs, **P**=**d**\*G, here the public keys are expressed in their compressed form.
 
-(P1a, P1b) = (02f8f1e55f7349f7ab27c078a916ec02e055164fc7e69fc23e402fa9809acfd4f4, 03f90506c9d6bc07e3afe49e32e9706afd2f5d7ece6ae575d02ea8890ddb3063e6)\
-(P2a, P2b) = (037309a5ba25f35a9fac04bba70ff53fad7e571b204fae5b15823d2043536b874e, 02a1f2ad58db44ff014bc13ab0da22c3f81ac2c9669d1ff0b2c859787f192452f9)\
-(P3a, P3b) = (02df8c2213cd1e506a71188075614630380cefb5e1f4ae403ce43a0c55eb3666f3, 02db49be37690b7352fa3e15d67cd4acdeea20b871caa50370c3916948c3faa0c4)\
-(P4a, P4b) = (03a4dc09a46077c7f58be8a70a9bff31637b58a94ebbe85215449da0f647be90b0, 0397b292e2720f16b8ad94551d161b2b8fa38cd39de37cb55a77302275bbfe4b25)\
-(P5a, P5b) = (02dada669eeafb333374f467c3514f7b2dfcc57a67b659c2da4f989f53b4c71875, 02516c9a350512c50f6aa30efb6b8f47864df632a4a74c3f526ae8ad21fa0c128d)\
-(P6a, P6b) = (035df4a0bb365ba44df94e9bd2f343111e17d74e26afbe525e9c629c967a53da6f, 0332b3bf3c3037286c7e6658cbccdc819432956c087b446b4c5db7080db611b802)
+(P1a, P1b) = (02f8f1e55f7349f7ab27c078a916ec02e055164fc7e69fc23e402fa9809acfd4f4, 029472f72b94a45f0580aa1fa4556710f314c90131c2ca6008a6654610889dd954)\
+(P2a, P2b) = (037309a5ba25f35a9fac04bba70ff53fad7e571b204fae5b15823d2043536b874e, 025432596e0bc862a0600c33ab8ae3894178aec2609ff2f61302a2c101542a0031)\
+(P3a, P3b) = (02df8c2213cd1e506a71188075614630380cefb5e1f4ae403ce43a0c55eb3666f3, 031395738095ed0121e2747cb47473d1a25af083312d4fb58c66de32315fe2701d)\
+(P4a, P4b) = (03a4dc09a46077c7f58be8a70a9bff31637b58a94ebbe85215449da0f647be90b0, 02c8aa00ccde29e951e77c1d891a09f996f2484dff7d5e061a8bc5705c7074bc0b)\
+(P5a, P5b) = (02dada669eeafb333374f467c3514f7b2dfcc57a67b659c2da4f989f53b4c71875, 022ba85a0fe3eef9d9144ee70ac2d9e8487954ca4cc27450be5641721a6b3852eb)\
+(P6a, P6b) = (035df4a0bb365ba44df94e9bd2f343111e17d74e26afbe525e9c629c967a53da6f, 027bcbda9aa7d2ca15499e56e819f3144f805c35e5724e050fac30542f9746ccf2)
 
 Now we can create a locking script requiring that the signature sizes under all the public keys be of 59 bytes or less
 
 ```
 OP_SIZE 3c OP_LESSTHAN OP_VERIFY 02f8f1e55f7349f7ab27c078a916ec02e055164fc7e69fc23e402fa9809acfd4f4 OP_CHECKSIGVERIFY
-OP_SIZE 3c OP_LESSTHAN OP_VERIFY 03f90506c9d6bc07e3afe49e32e9706afd2f5d7ece6ae575d02ea8890ddb3063e6 OP_CHECKSIGVERIFY
+OP_SIZE 3c OP_LESSTHAN OP_VERIFY 029472f72b94a45f0580aa1fa4556710f314c90131c2ca6008a6654610889dd954 OP_CHECKSIGVERIFY
 OP_SIZE 3c OP_LESSTHAN OP_VERIFY 037309a5ba25f35a9fac04bba70ff53fad7e571b204fae5b15823d2043536b874e OP_CHECKSIGVERIFY
-OP_SIZE 3c OP_LESSTHAN OP_VERIFY 02a1f2ad58db44ff014bc13ab0da22c3f81ac2c9669d1ff0b2c859787f192452f9 OP_CHECKSIGVERIFY
+OP_SIZE 3c OP_LESSTHAN OP_VERIFY 025432596e0bc862a0600c33ab8ae3894178aec2609ff2f61302a2c101542a0031 OP_CHECKSIGVERIFY
 OP_SIZE 3c OP_LESSTHAN OP_VERIFY 02df8c2213cd1e506a71188075614630380cefb5e1f4ae403ce43a0c55eb3666f3 OP_CHECKSIGVERIFY
-OP_SIZE 3c OP_LESSTHAN OP_VERIFY 02db49be37690b7352fa3e15d67cd4acdeea20b871caa50370c3916948c3faa0c4 OP_CHECKSIGVERIFY
+OP_SIZE 3c OP_LESSTHAN OP_VERIFY 031395738095ed0121e2747cb47473d1a25af083312d4fb58c66de32315fe2701d OP_CHECKSIGVERIFY
 OP_SIZE 3c OP_LESSTHAN OP_VERIFY 03a4dc09a46077c7f58be8a70a9bff31637b58a94ebbe85215449da0f647be90b0 OP_CHECKSIGVERIFY
-OP_SIZE 3c OP_LESSTHAN OP_VERIFY 0397b292e2720f16b8ad94551d161b2b8fa38cd39de37cb55a77302275bbfe4b25 OP_CHECKSIGVERIFY
+OP_SIZE 3c OP_LESSTHAN OP_VERIFY 02c8aa00ccde29e951e77c1d891a09f996f2484dff7d5e061a8bc5705c7074bc0b OP_CHECKSIGVERIFY
 OP_SIZE 3c OP_LESSTHAN OP_VERIFY 02dada669eeafb333374f467c3514f7b2dfcc57a67b659c2da4f989f53b4c71875 OP_CHECKSIGVERIFY
-OP_SIZE 3c OP_LESSTHAN OP_VERIFY 02516c9a350512c50f6aa30efb6b8f47864df632a4a74c3f526ae8ad21fa0c128d OP_CHECKSIGVERIFY
+OP_SIZE 3c OP_LESSTHAN OP_VERIFY 022ba85a0fe3eef9d9144ee70ac2d9e8487954ca4cc27450be5641721a6b3852eb OP_CHECKSIGVERIFY
 OP_SIZE 3c OP_LESSTHAN OP_VERIFY 035df4a0bb365ba44df94e9bd2f343111e17d74e26afbe525e9c629c967a53da6f OP_CHECKSIGVERIFY
-OP_SIZE 3c OP_LESSTHAN OP_VERIFY 0332b3bf3c3037286c7e6658cbccdc819432956c087b446b4c5db7080db611b802 OP_CHECKSIGVERIFY
+OP_SIZE 3c OP_LESSTHAN OP_VERIFY 027bcbda9aa7d2ca15499e56e819f3144f805c35e5724e050fac30542f9746ccf2 OP_CHECKSIGVERIFY
 ```
 
-A P2WSH address of the above script on mainnet results in: bc1q5jwt3crhwrkg4l7v3zwru32hdsug8j2407kdn3rx8ys5wyu24ljqlw4dz3
+A P2WSH address of the above script on mainnet results in: bc1qtcsnxzxefxvv0jqe9ax5mq45fcn4lv6rttccuhe97g3057py7wuqlm2d0q
 
-Finally we can create a transaction locking some amount of BTC to the bc1q5jwt3crhwrkg4l7v3zwru32hdsug8j2407kdn3rx8ys5wyu24ljqlw4dz3 address and we should also add an OP_RETURN output specifying the difficulty, such that the miner is able to re-construct the private keys & public keys.
+Finally we can create a transaction locking some amount of BTC to the bc1qtcsnxzxefxvv0jqe9ax5mq45fcn4lv6rttccuhe97g3057py7wuqlm2d0q address and we should also add an OP_RETURN output specifying the difficulty, such that the miner is able to re-construct the private keys & public keys.
 
 Mainnet transactions:
 
-1. PoW locked output initiated as output 0 of tx - [a9080e34c79ddec6fc430108cbea5f6a86dfc7fb6d04b7612cfd542548735229](https://mempool.space/tx/a9080e34c79ddec6fc430108cbea5f6a86dfc7fb6d04b7612cfd542548735229#vout=0)
-2. Intermediate transation whose output was used as input 1 of the claim transaction - [bec2ec7e08d28b2e59ab9a66d9f054292c093f9c0f7b170265eb1c9834c42c6f](https://mempool.space/tx/bec2ec7e08d28b2e59ab9a66d9f054292c093f9c0f7b170265eb1c9834c42c6f)
-3. Claim transaction - [2646b0f5633b45c5e2acb0eec639dea8da92d5d17a16fa9479ef988bede06d4a](https://mempool.space/tx/2646b0f5633b45c5e2acb0eec639dea8da92d5d17a16fa9479ef988bede06d4a)
+1. PoW locked output initiated as output 0 of tx - [026e22cf7a43be4e6b952be681ce06774b92e11a99815537298f6214c026a383](https://mempool.space/tx/026e22cf7a43be4e6b952be681ce06774b92e11a99815537298f6214c026a383#vout=0)
+2. Intermediate transation whose output was used as input 1 of the claim transaction - [d59dd6bcc254c2208ba84d5ee254fa88dfb0bb3c5131ed573541345a673b3c46](https://mempool.space/tx/d59dd6bcc254c2208ba84d5ee254fa88dfb0bb3c5131ed573541345a673b3c46)
+3. Claim transaction - [dcb2eadfc77ede56fe96fc6391b771eb4b92667054c160634ad393427911cd67](https://mempool.space/tx/dcb2eadfc77ede56fe96fc6391b771eb4b92667054c160634ad393427911cd67)
 
 ### Edge cases
 
 #### Not enough variety for SIGHASH_NONE \| ANYONECANPAY
 
-It might happen that in case the difficulty is high enough, the grinding for SIGHASH_NONE \| ANYONECANPAY couldn't find any valid solution by grinding the transaction locktime (around 1200000000 possibilities) & input 0's nSequence (around 2^31 possibilities with the most significant enable bit being 0 to ensure no consensus meaning) - in total around ~2^61 possibilities, in that case only other option is to start grinding transaction version, resulting in the total of ~2^93 possibilities - this will however make the transaction non-standard and it will have to be broadcasted directly to a miner to include it in the block. This is unlikely to happen anytime soon though, as even with the bitcoin's current block difficulty the chance of it happening is just ~1:10^8.
+It might happen that in case the difficulty is high enough, the grinding for SIGHASH_NONE \| ANYONECANPAY couldn't find any valid solution by grinding the transaction locktime (around 1200000000 possibilities) & input 0's nSequence (around 2^31 possibilities with the most significant enable bit being 0 to ensure no consensus meaning) - in total around ~2^61 possibilities, in that case only other option is to start grinding transaction version, resulting in the total of ~2^93 possibilities - this will however make the transaction non-standard and it will have to be broadcasted directly to a miner to include it in the block. This is unlikely to happen anytime soon though, as even with the bitcoin's current block difficulty the chance of it happening is just \~1:10^8.
 
 ### Improvements
 
 Miners can cache intermediary states of sha256 hash function when grinding just parts of the transaction to speed up the process, they can also cache sha256 hashes of outputs & inputs, respectively when changing the other.
-
