@@ -189,7 +189,7 @@ function toAddress(script) {
  */
 function getAddress(work) {
     const script = toScript(toPublicKeys(getKeyset(work)));
-    console.log(bitcoin.script.toASM(script));
+    // console.log(bitcoin.script.toASM(script));
     return toAddress(script);
 }
 
