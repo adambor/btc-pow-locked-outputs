@@ -1,5 +1,3 @@
 node_modules
 package-lock.json
-tx.txt
-finalTx.txt
-psbt.tx
+transactions

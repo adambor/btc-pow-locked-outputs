@@ -1,11 +1,14 @@
 const BN = require("bn.js");
-const secp256k1field = require('./secp256k1-field');
+const secp256k1field = require('../secp256k1-field');
 const secp256k1 = require("secp256k1");
 const {sqrt} = require("bn-sqrt");
 const bitcoin = require("bitcoinjs-lib");
 const crypto = require("crypto");
+const {hashForWitnessV0} = require("./sighasher");
 
-const network = global.network;
+/**
+ * Version of the pow-script caching the values for sighash to speed up the computation
+ */
 
 //Well known nonce k=1/2 producing a nonce point with short x coordinate
 const k = secp256k1field.invert(new BN(2));
@@ -62,7 +65,6 @@ function signP2WPKHInput(tx, vin, witnessUtxo, privateKey, sighash) {
     const publicKey = secp256k1.publicKeyCreate(privateKey, true, Buffer);
     const hash = tx.hashForWitnessV0(vin, bitcoin.payments.p2pkh({
         pubkey: publicKey,
-        network
     }).output, witnessUtxo.value, sighash);
     const ecdsaSignature = secp256k1.ecdsaSign(hash, privateKey).signature;
     const bufferSighash = Buffer.from([sighash]);
@@ -178,8 +180,7 @@ function toScript(publicKeys) {
  */
 function toAddress(script) {
     return bitcoin.payments.p2wsh({
-        redeem: {output: script},
-        network
+        redeem: {output: script}
     }).address;
 }
 
@@ -188,9 +189,7 @@ function toAddress(script) {
  * @returns {string} On-chain p2wsh address
  */
 function getAddress(work) {
-    const script = toScript(toPublicKeys(getKeyset(work)));
-    console.log(bitcoin.script.toASM(script));
-    return toAddress(script);
+    return toAddress(toScript(toPublicKeys(getKeyset(work))));
 }
 
 /**
@@ -227,10 +226,13 @@ function getIntervals(keyset) {
  * @param sighashes {number[]} Array of sighashes to check, all need to be satisfied for the function to return success
  * @returns {{I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[] | null} Array of valid intervals or null
  */
-function checkHash(tx, intervals, witnessUtxo, sighashes) {
+function checkHash(tx, intervals, witnessUtxo, sighashes, sighashCache) {
     const foundIntervals = [];
     for(let sighash of sighashes) {
-        const hash = tx.hashForWitnessV0(0, witnessUtxo.script, witnessUtxo.value, sighash);
+        // const hash = tx.hashForWitnessV0(0, witnessUtxo.script, witnessUtxo.value, sighash);
+        const hash = hashForWitnessV0(tx, 0, witnessUtxo.script, witnessUtxo.value, sighash, sighashCache==null ? null : sighashCache[sighash]);
+        // const hash2 = hashForWitnessV0(tx, 0, witnessUtxo.script, witnessUtxo.value, sighash);
+        // if(!hash.equals(hash2)) throw new Error("Sighashes don't match!");
         const hashBN = new BN(hash, 16);
         const found = intervals.find(({I1, I2}) =>
             (hashBN.gte(I1.down) && hashBN.lt(I1.up)) ||
@@ -295,7 +297,7 @@ function grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, int
     //Create ephemeral key for the intermediate transaction
     const key = crypto.randomBytes(32);
     const publicKey = secp256k1.publicKeyCreate(key, true, Buffer);
-    const payment = bitcoin.payments.p2wpkh({pubkey: publicKey, network});
+    const payment = bitcoin.payments.p2wpkh({pubkey: publicKey});
 
     const leavesValue = intermediateWitnessUtxo.value-(110*feeRate);
     const intermediateTx = new bitcoin.Transaction();
@@ -313,7 +315,9 @@ function grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, int
         intermediateTx.locktime = locktime;
         while(nSequence<0xEFFFFFFF && validIntervals==null) {
             intermediateTx.ins[0].sequence = nSequence;
+            // const hash = intermediateTx.getHash();
             const hash = intermediateTx.getHash();
+            // if(!hash.equals(hash2)) throw new Error("Tx hashes don't match!");
             tx.ins[1].hash = hash;
             validIntervals = checkHash(tx, intervals, witnessUtxo, [0x02]);
             work+=2;
@@ -322,7 +326,7 @@ function grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, int
         locktime++;
     }
 
-    const intermediatePsbt = new bitcoin.Psbt({network});
+    const intermediatePsbt = new bitcoin.Psbt();
     intermediatePsbt.addInput(intermediateTx.ins[0]);
     intermediatePsbt.updateInput(0, {
         witnessUtxo: intermediateWitnessUtxo
@@ -372,13 +376,17 @@ function grindSighashSingle(tx, witnessUtxo, intervals, outputValue) {
     let counter = 0;
     let validIntervals = null;
     let p2wshPayment = null;
+    const sighashCache = [];
+    sighashCache[0x03] = {};
+    sighashCache[0x83] = {};
     while(validIntervals==null) {
         p2wshPayment = bitcoin.payments.p2wsh({
-            redeem: {output: Buffer.concat([pushNumber(counter), baseScript])},
-            network
+            redeem: {output: Buffer.concat([pushNumber(counter), baseScript])}
         });
         tx.outs[0].script = p2wshPayment.output;
-        validIntervals = checkHash(tx, intervals, witnessUtxo, [0x03, 0x83]);
+        validIntervals = checkHash(tx, intervals, witnessUtxo, [0x03, 0x83], sighashCache);
+        delete sighashCache[0x03].hashOutputs;
+        delete sighashCache[0x83].hashOutputs;
         work++;
         counter++;
     }
@@ -412,9 +420,14 @@ function grindSighashAll(tx, witnessUtxo, intervals) {
     let work = 0;
     let counter = 0;
     let validIntervals = null;
+    const sighashCache = [];
+    sighashCache[0x01] = {};
+    sighashCache[0x81] = {};
     while(validIntervals==null) {
         tx.outs[1].script = Buffer.concat([baseScript, pushNumber(counter)]);
-        validIntervals = checkHash(tx, intervals, witnessUtxo, [0x01, 0x81]);
+        validIntervals = checkHash(tx, intervals, witnessUtxo, [0x01, 0x81], sighashCache);
+        delete sighashCache[0x01].hashOutputs;
+        delete sighashCache[0x81].hashOutputs;
         work++;
         counter++;
     }
@@ -438,15 +451,13 @@ function grindSighashAll(tx, witnessUtxo, intervals) {
  *  to be used for intermediate transaction
  * @param feeRate {number} Fee rate to use for the transactions
  * @param recipient {string} Final recipient of the reward
- * @param verbose {boolean} Whether to print out verbose output
  * @returns {{intermediatePsbt: bitcoin.Psbt, claimTx: bitcoin.Transaction, spendTx: bitcoin.Transaction, totalWork: number}}
  */
 function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, recipient, verbose = false) {
     const keyset = getKeyset(work);
     const script = toScript(toPublicKeys(keyset));
     const p2wshOutput = bitcoin.payments.p2wsh({
-        redeem: {output: script},
-        network
+        redeem: {output: script}
     });
     //Check that script matches
     if(!witnessUtxo.script.equals(p2wshOutput.output)) throw new Error("Witness UTXO output script mismatch");
@@ -527,24 +538,22 @@ function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, r
     //Reverse the witness stack, because it is processed from last element to the first
     in0WitnessStack.reverse();
 
-    // console.log("Using witness stack: ",in0WitnessStack.map(val => val.toString("hex")));
-
     //Push the p2wsh redeem script to the witness stack
     in0WitnessStack.push(script);
 
     tx.ins[0].witness = in0WitnessStack;
     tx.ins[1].witness = [
+        secp256k1.publicKeyCreate(sighashNone.intermediateKey, true, Buffer),
         signP2WPKHInput(tx, 1, {
             script: sighashNone.intermediatePsbt.txOutputs[0].script,
             value: sighashNone.intermediatePsbt.txOutputs[0].value
-        }, sighashNone.intermediateKey, 0x01),
-        secp256k1.publicKeyCreate(sighashNone.intermediateKey, true, Buffer)
+        }, sighashNone.intermediateKey, 0x01)
     ];
 
     //Create transaction spending from 1st output of the claim transaction, to the recipient address
     const spendTx = new bitcoin.Transaction();
     spendTx.addInput(tx.getHash(), 0);
-    spendTx.addOutput(bitcoin.address.toOutputScript(recipient, network), tx.outs[0].value-(140*feeRate));
+    spendTx.addOutput(bitcoin.address.toOutputScript(recipient), tx.outs[0].value-(140*feeRate));
     spendTx.ins[0].witness = [
         signP2WSHInput(spendTx, 0, {
             script: sighashSingle.claimScript,
@@ -568,4 +577,3 @@ module.exports = {
     grindTransaction,
     getAddress
 };
-
