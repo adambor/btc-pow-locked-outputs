@@ -24,8 +24,9 @@ const nHalf = secp256k1field.n.div(new BN(2)).add(new BN(1));
  * @param sighash {number} Sighash to use for signing
  * @returns {Buffer} DER-encoded signature
  */
-function signP2WSHInputWithKnownNonce(tx, witnessUtxo, d, sighash) {
+function signP2WSHInputWithKnownNonce(tx, witnessUtxo, d, sighash, verbose = false) {
     const hash = tx.hashForWitnessV0(0, witnessUtxo.script, witnessUtxo.value, sighash);
+    if(verbose) console.log("Transaction sighash 0x"+sighash.toString(16).padStart(2, "0")+": 0x"+hash.toString("hex"));
     const ecdsaSignature = secp256k1.ecdsaSign(hash, d.toBuffer("be"), {
         noncefn: () => new Uint8Array(k.toBuffer("be"))
     }).signature;
@@ -110,7 +111,7 @@ function getXFromPrivateKey(d) {
  * @returns {Buffer} Compressed public key
  */
 function getPublicKey(d) {
-    return secp256k1.publicKeyCreate(d.toBuffer("be", 32), true);
+    return secp256k1.publicKeyCreate(d.toBuffer("be", 32), true, Buffer);
 }
 
 /**
@@ -118,12 +119,13 @@ function getPublicKey(d) {
  * @param work {number} Amount of work required to spend the output
  * @returns {{d1: BN, d2: BN}[]} Generated private key pairs
  */
-function getKeyset(work) {
+function getKeyset(work, verbose = false) {
     const deltaX = new BN(2).pow(new BN(246)).sub(
         new BN(105).mul(secp256k1field.n).div(
             new BN(6).mul(sqrt(new BN(289).add(new BN(2100).mul(new BN(work))))).sub(new BN(102))
         )
     );
+    if(verbose) console.log("deltaX = 0x"+deltaX.toString(16).padStart(64, "0"));
 
     if(deltaX.isNeg()) throw new Error("Work less than minimal");
 
@@ -135,7 +137,12 @@ function getKeyset(work) {
         const d1 = getPrivateKeyFromX(x1);
         const d2 = getPrivateKeyFromX(x2);
         keyset.push({d1, d2});
+        if(verbose) console.log("(x"+(i+1)+"a, x"+(i+1)+"b) = (0x"+x1.toString(16).padStart(64, "0")+", 0x"+x2.toString(16).padStart(64, "0")+")");
     }
+
+    if(verbose) keyset.forEach(({d1, d2}, i) => {
+        if(verbose) console.log("(d"+(i+1)+"a, d"+(i+1)+"b) = (0x"+d1.toString(16).padStart(64, "0")+", 0x"+d2.toString(16).padStart(64, "0")+")");
+    });
 
     return keyset;
 }
@@ -144,17 +151,22 @@ function getKeyset(work) {
  * @param keyset {{d1: BN, d2: BN}[]} Private key pairs
  * @returns {Buffer[]} Array of compressed public keys
  */
-function toPublicKeys(keyset) {
-    return keyset.map(({d1, d2}) => [getPublicKey(d1), getPublicKey(d2)]).flat();
+function toPublicKeys(keyset, verbose = false) {
+    return keyset.map(({d1, d2}, i) => {
+        const P1 = getPublicKey(d1);
+        const P2 = getPublicKey(d2);
+        if(verbose) console.log("(P"+(i+1)+"a, P"+(i+1)+"b) = ("+P1.toString("hex")+", "+P2.toString("hex")+")");
+        return [P1, P2];
+    }).flat();
 }
 
 /**
  * @param publicKeys {Buffer[]} Array of compressed public keys
  * @returns {Buffer} A redeem script for the output
  */
-function toScript(publicKeys) {
+function toScript(publicKeys, verbose = false) {
     return Buffer.concat(publicKeys.map(publicKey => {
-        return Buffer.concat([
+        const script = Buffer.concat([
             Buffer.from([
                 bitcoin.script.OPS.OP_SIZE,
                 0x01,
@@ -168,6 +180,8 @@ function toScript(publicKeys) {
                 bitcoin.script.OPS.OP_CHECKSIGVERIFY
             ])
         ]);
+        if(verbose) console.log(bitcoin.script.toASM(script));
+        return script;
     }));
 }
 
@@ -187,9 +201,10 @@ function toAddress(script) {
  * @param work {number} Amount of work required to spend the output
  * @returns {string} On-chain p2wsh address
  */
-function getAddress(work) {
-    const script = toScript(toPublicKeys(getKeyset(work)));
-    // console.log(bitcoin.script.toASM(script));
+function getAddress(work, verbose = false) {
+    const keys = getKeyset(work, verbose);
+    const publicKeys = toPublicKeys(keys, verbose);
+    const script = toScript(publicKeys, verbose);
     return toAddress(script);
 }
 
@@ -453,6 +468,9 @@ function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, r
     witnessUtxo.script = script;
 
     let intervals = getIntervals(keyset);
+    if(verbose) intervals.forEach(({I1, I2}, i) => {
+        console.log("I"+(i+1)+" = [0x"+I1.down.toString(16).padStart(64, "0")+", 0x"+I1.up.toString(16).padStart(64, "0")+") ∪ [0x"+I2.down.toString(16).padStart(64, "0")+", 0x"+I2.up.toString(16).padStart(64, "0")+")");
+    });
 
     //Construct transaction
     const tx = new bitcoin.Transaction();
@@ -462,40 +480,41 @@ function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, r
     if(verbose) console.log("\nGrinding SIGHASH_NONE | ANYONECANPAY...");
     const sighashNoneA = grindSighashNoneAnyonecanpay(tx, witnessUtxo, intervals);
     intervals = intervals.filter(value => !sighashNoneA.validIntervals.includes(value)); //Remove used up intervals
-    if(verbose) console.log("Using locktime: "+tx.locktime+" input0nSequence: "+tx.ins[0].sequence);
+    if(verbose) console.log("locktime: "+tx.locktime+
+        "\ninput0nSequence: "+tx.ins[0].sequence);
     if(verbose) console.log("Work: "+sighashNoneA.work+" intervals found: ", sighashNoneA.validIntervals.map(interval => interval.index));
 
     if(verbose) console.log("\nGrinding SIGHASH_NONE...");
     const sighashNone = grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, intervals);
     intervals = intervals.filter(value => !sighashNone.validIntervals.includes(value)); //Remove used up intervals
-    if(verbose) console.log("Using"+
-        " intermediateTxLocktime: "+sighashNone.intermediatePsbt.locktime+
-        " intermediateTxInput0nSequence: "+sighashNone.intermediatePsbt.txInputs[0].sequence+
-        " intermediateKey: "+sighashNone.intermediateKey.toString("hex")+
-        " intermediateOutput0Script: "+sighashNone.intermediatePsbt.txOutputs[0].script.toString("hex")+
-        " intermediateOutput0Value: "+sighashNone.intermediatePsbt.txOutputs[0].value+
-        " intermediateTxId: "+sighashNone.intermediateTxId
+    if(verbose) console.log("intermediateTxLocktime: "+sighashNone.intermediatePsbt.locktime+
+        "\nintermediateTxInput0nSequence: "+sighashNone.intermediatePsbt.txInputs[0].sequence+
+        "\nintermediateKey: "+sighashNone.intermediateKey.toString("hex")+
+        "\nintermediatePublicKey: "+secp256k1.publicKeyCreate(sighashNone.intermediateKey, true, Buffer).toString("hex")+
+        "\nintermediateOutput0Script: "+sighashNone.intermediatePsbt.txOutputs[0].script.toString("hex")+
+        "\nintermediateOutput0Value: "+sighashNone.intermediatePsbt.txOutputs[0].value+
+        "\nintermediateTxId: "+sighashNone.intermediateTxId
     );
     if(verbose) console.log("Work: "+sighashNone.work+" intervals found: ", sighashNone.validIntervals.map(interval => interval.index));
 
     if(verbose) console.log("\nGrinding SIGHASH_SINGLE and SIGHASH_SINGLE | ANYONECANPAY...");
     const sighashSingle = grindSighashSingle(tx, witnessUtxo, intervals, witnessUtxo.value+sighashNone.intermediatePsbt.txOutputs[0].value-(500*feeRate));
     intervals = intervals.filter(value => !sighashSingle.validIntervals.includes(value)); //Remove used up intervals
-    if(verbose) console.log("Using"+
-        " claimKey: "+sighashSingle.claimKey.toString("hex")+
-        " counter: "+sighashSingle.counter+
-        " output0RedeemScript: "+sighashSingle.claimScript.toString("hex")+
-        " output0Script: "+tx.outs[0].script.toString("hex")+
-        " output0Value: "+tx.outs[0].value
+    if(verbose) console.log("claimKey: "+sighashSingle.claimKey.toString("hex")+
+        "\ncounter: "+sighashSingle.counter+
+        "\noutput0RedeemScript(HEX): "+sighashSingle.claimScript.toString("hex")+
+        "\noutput0RedeemScript(ASM): "+bitcoin.script.toASM(sighashSingle.claimScript)+
+        "\noutput0Script: "+tx.outs[0].script.toString("hex")+
+        "\noutput0Value: "+tx.outs[0].value
     );
     if(verbose) console.log("Work: "+sighashSingle.work+" intervals found: ", sighashSingle.validIntervals.map(interval => interval.index));
 
     if(verbose) console.log("\nGrinding SIGHASH_ALL and SIGHASH_ALL | ANYONECANPAY...");
     const sighashAll = grindSighashAll(tx, witnessUtxo, intervals);
-    if(verbose) console.log("Using"+
-        " counter: "+sighashAll.counter+
-        " output1Script: "+tx.outs[1].script.toString("hex")+
-        " output1Value: "+tx.outs[1].value
+    if(verbose) console.log("counter: "+sighashAll.counter+
+        "\noutput1Script(HEX): "+tx.outs[1].script.toString("hex")+
+        "\noutput1Script(ASM): "+bitcoin.script.toASM(tx.outs[1].script)+
+        "\noutput1Value: "+tx.outs[1].value
     );
     if(verbose) console.log("Work: "+sighashAll.work+" intervals found: ", sighashAll.validIntervals.map(interval => interval.index));
 
@@ -517,8 +536,8 @@ function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, r
     //Add signatures to the witness stack
     const in0WitnessStack = [];
     for(let i=0;i<6;i++) {
-        in0WitnessStack.push(signP2WSHInputWithKnownNonce(tx, witnessUtxo, keyset[i].d1, intervalSighashes[i]));
-        in0WitnessStack.push(signP2WSHInputWithKnownNonce(tx, witnessUtxo, keyset[i].d2, intervalSighashes[i]));
+        in0WitnessStack.push(signP2WSHInputWithKnownNonce(tx, witnessUtxo, keyset[i].d1, intervalSighashes[i], verbose));
+        in0WitnessStack.push(signP2WSHInputWithKnownNonce(tx, witnessUtxo, keyset[i].d2, intervalSighashes[i], verbose));
     }
 
     //Push additional 0x01 on the witness stack, such that there is 0x01 on the stack when the execution suceeds

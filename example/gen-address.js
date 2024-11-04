@@ -23,4 +23,4 @@ if(isNaN(work)) {
     return;
 }
 console.log("Generating a locking script address for work: "+work);
-console.log(powScript.getAddress(work));
+console.log(powScript.getAddress(work, true));
