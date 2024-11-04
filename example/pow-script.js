@@ -280,7 +280,8 @@ function grindSighashNoneAnyonecanpay(tx, witnessUtxo, intervals) {
  *  work: number,
  *  validIntervals: {I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[],
  *  intermediatePsbt: bitcoin.Psbt,
- *  intermediateKey: Buffer
+ *  intermediateKey: Buffer,
+ *  intermediateTxId: string
  * }} A work done to get the valid hash, a valid interval used up for the hash, intermediate tx PSBT & key for the output
  *  of the intermediate tx PSBT to be used as 2nd input in the claim transaction
  */
@@ -308,7 +309,7 @@ function grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, int
             intermediateTx.ins[0].sequence = nSequence;
             tx.ins[1].hash = intermediateTx.getHash();
             validIntervals = checkHash(tx, intervals, witnessUtxo, [0x02]);
-            work++;
+            work+=2;
             nSequence++;
         }
         locktime++;
@@ -327,7 +328,8 @@ function grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, int
         work,
         validIntervals,
         intermediatePsbt,
-        intermediateKey: key
+        intermediateKey: key,
+        intermediateTxId: intermediateTx.getId()
     };
 }
 
@@ -338,7 +340,7 @@ function grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, int
  * @param witnessUtxo {{script: Buffer, value: number}} Utxo data about the PoW locked output
  * @param intervals {{I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[]} Array of pairs of intervals
  * @param outputValue {number} Amount of sats to put into the first transaction output
- * @returns {{work: number, validIntervals: {I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[], claimKey: Buffer, claimScript: Buffer}} A work done
+ * @returns {{work: number, validIntervals: {I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[], claimKey: Buffer, claimScript: Buffer, counter: number}} A work done
  *  to get the valid hash, and a valid interval used up for the hash
  */
 function grindSighashSingle(tx, witnessUtxo, intervals, outputValue) {
@@ -377,7 +379,8 @@ function grindSighashSingle(tx, witnessUtxo, intervals, outputValue) {
         work,
         validIntervals,
         claimKey: key,
-        claimScript: p2wshPayment.redeem.output
+        claimScript: p2wshPayment.redeem.output,
+        counter: counter-1
     };
 }
 
@@ -388,7 +391,7 @@ function grindSighashSingle(tx, witnessUtxo, intervals, outputValue) {
  * @param tx {bitcoin.Transaction} Claim transaction to grind
  * @param witnessUtxo {{script: Buffer, value: number}} Utxo data about the PoW locked output
  * @param intervals {{I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[]} Array of pairs of intervals
- * @returns {{work: number, validIntervals: {I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[]}} A work done
+ * @returns {{work: number, validIntervals: {I1: {down: BN, up: BN}, I2: {down: BN, up: BN}, index: number}[], counter: number}} A work done
  *  to get the valid hash, and a valid interval used up for the hash
  */
 function grindSighashAll(tx, witnessUtxo, intervals) {
@@ -410,7 +413,8 @@ function grindSighashAll(tx, witnessUtxo, intervals) {
 
     return {
         work,
-        validIntervals
+        validIntervals,
+        counter: counter-1
     };
 }
 
@@ -428,7 +432,7 @@ function grindSighashAll(tx, witnessUtxo, intervals) {
  * @param recipient {string} Final recipient of the reward
  * @returns {{intermediatePsbt: bitcoin.Psbt, claimTx: bitcoin.Transaction, spendTx: bitcoin.Transaction, totalWork: number}}
  */
-function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, recipient) {
+function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, recipient, verbose = false) {
     const keyset = getKeyset(work);
     const script = toScript(toPublicKeys(keyset));
     const p2wshOutput = bitcoin.payments.p2wsh({
@@ -445,16 +449,45 @@ function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, r
     tx.addInput(Buffer.from(witnessUtxo.txId, "hex").reverse(), witnessUtxo.vout);
 
     //Grind transaction
+    if(verbose) console.log("\nGrinding SIGHASH_NONE | ANYONECANPAY...");
     const sighashNoneA = grindSighashNoneAnyonecanpay(tx, witnessUtxo, intervals);
     intervals = intervals.filter(value => !sighashNoneA.validIntervals.includes(value)); //Remove used up intervals
+    if(verbose) console.log("Using locktime: "+tx.locktime+" input0nSequence: "+tx.ins[0].sequence);
+    if(verbose) console.log("Work: "+sighashNoneA.work+" intervals found: ", sighashNoneA.validIntervals.map(interval => interval.index));
 
+    if(verbose) console.log("\nGrinding SIGHASH_NONE...");
     const sighashNone = grindSighashNone(tx, witnessUtxo, intermediateWitnessUtxo, feeRate, intervals);
     intervals = intervals.filter(value => !sighashNone.validIntervals.includes(value)); //Remove used up intervals
+    if(verbose) console.log("Using"+
+        " intermediateTxLocktime: "+sighashNone.intermediatePsbt.locktime+
+        " intermediateTxInput0nSequence: "+sighashNone.intermediatePsbt.txInputs[0].sequence+
+        " intermediateKey: "+sighashNone.intermediateKey.toString("hex")+
+        " intermediateOutput0Script: "+sighashNone.intermediatePsbt.txOutputs[0].script.toString("hex")+
+        " intermediateOutput0Value: "+sighashNone.intermediatePsbt.txOutputs[0].value+
+        " intermediateTxId: "+sighashNone.intermediateTxId
+    );
+    if(verbose) console.log("Work: "+sighashNone.work+" intervals found: ", sighashNone.validIntervals.map(interval => interval.index));
 
+    if(verbose) console.log("\nGrinding SIGHASH_SINGLE and SIGHASH_SINGLE | ANYONECANPAY...");
     const sighashSingle = grindSighashSingle(tx, witnessUtxo, intervals, witnessUtxo.value+sighashNone.intermediatePsbt.txOutputs[0].value-(500*feeRate));
     intervals = intervals.filter(value => !sighashSingle.validIntervals.includes(value)); //Remove used up intervals
+    if(verbose) console.log("Using"+
+        " claimKey: "+sighashSingle.claimKey.toString("hex")+
+        " counter: "+sighashSingle.counter+
+        " output0RedeemScript: "+sighashSingle.claimScript.toString("hex")+
+        " output0Script: "+tx.outs[0].script.toString("hex")+
+        " output0Value: "+tx.outs[0].value
+    );
+    if(verbose) console.log("Work: "+sighashSingle.work+" intervals found: ", sighashSingle.validIntervals.map(interval => interval.index));
 
+    if(verbose) console.log("\nGrinding SIGHASH_ALL and SIGHASH_ALL | ANYONECANPAY...");
     const sighashAll = grindSighashAll(tx, witnessUtxo, intervals);
+    if(verbose) console.log("Using"+
+        " counter: "+sighashAll.counter+
+        " output1Script: "+tx.outs[1].script.toString("hex")+
+        " output1Value: "+tx.outs[1].value
+    );
+    if(verbose) console.log("Work: "+sighashAll.work+" intervals found: ", sighashAll.validIntervals.map(interval => interval.index));
 
     //Get the indexes of the private key pairs to use for respective sighashes
     const [shNoneA] = sighashNoneA.validIntervals.map(interval => interval.index);
@@ -514,26 +547,13 @@ function grindTransaction(work, witnessUtxo, intermediateWitnessUtxo, feeRate, r
         intermediatePsbt: sighashNone.intermediatePsbt,
         claimTx: tx,
         spendTx,
+        expectedWork: work,
         totalWork
     };
 }
 
-const witnessUtxo = {
-    script: Buffer.from("00205e213308d94998c7c8192f4d4d82b44e275fb3435af18e5f25f222fa7824f3b8", "hex"),
-    value: 1000,
-    txId: "026e22cf7a43be4e6b952be681ce06774b92e11a99815537298f6214c026a383",
-    vout: 0
+module.exports = {
+    grindTransaction,
+    getAddress
 };
-const intermediateWitnessUtxo = {
-    script: Buffer.from("00140ec6a7ea9ebb5abf708f170f3b81ec377d63edbf", "hex"),
-    value: 3147,
-    txId: "026e22cf7a43be4e6b952be681ce06774b92e11a99815537298f6214c026a383",
-    vout: 1
-};
-console.log(grindTransaction(
-    Math.pow(2, 18),
-    witnessUtxo,
-    intermediateWitnessUtxo,
-    3,
-    "bc1qca8ladhsmutjsx63gcghl2k5fw8f57j0yfqgjk"
-));
+
