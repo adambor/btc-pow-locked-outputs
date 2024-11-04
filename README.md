@@ -141,6 +141,10 @@ To prevent other miners from re-using non-ANYONECANPAY signatures, the input 1 o
 
 ### Example
 
+There is a Node.JS application in /example directory of the repo, allowing you to create & mine PoW-locked output with arbitrary difficulty (work). Here is a detailed example of how the code actually works.
+
+#### Setup
+
 A simple example for constructing an output with a difficulty of 2^18 (a miner on average has to go through 262144 hashes to find a solution) - all numbers are in hexadecimal.
 
 Field order **n** = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141\
@@ -191,15 +195,139 @@ OP_SIZE 3c OP_LESSTHAN OP_VERIFY 035df4a0bb365ba44df94e9bd2f343111e17d74e26afbe5
 OP_SIZE 3c OP_LESSTHAN OP_VERIFY 027bcbda9aa7d2ca15499e56e819f3144f805c35e5724e050fac30542f9746ccf2 OP_CHECKSIGVERIFY
 ```
 
-A P2WSH address of the above script on mainnet results in: bc1qtcsnxzxefxvv0jqe9ax5mq45fcn4lv6rttccuhe97g3057py7wuqlm2d0q
+A P2WSH address of the above redeem script on testnet results in: tb1qtcsnxzxefxvv0jqe9ax5mq45fcn4lv6rttccuhe97g3057py7wuqgnuz40
 
-Finally we can create a transaction locking some amount of BTC to the bc1qtcsnxzxefxvv0jqe9ax5mq45fcn4lv6rttccuhe97g3057py7wuqlm2d0q address and we should also add an OP_RETURN output specifying the difficulty, such that the miner is able to re-construct the private keys & public keys.
+Finally we can fund the address output with some amount of BTC which will be a reward for the miner. Like transaction [2c6747829c435da3be23ba350c7d5eab5b9fb8717de2613973191305779e3075](https://mempool.space/testnet4/tx/2c6747829c435da3be23ba350c7d5eab5b9fb8717de2613973191305779e3075#vout=0) on testnet.
 
-Mainnet transactions:
+#### Mining/grinding
 
-1. PoW locked output initiated as output 0 of tx - [026e22cf7a43be4e6b952be681ce06774b92e11a99815537298f6214c026a383](https://mempool.space/tx/026e22cf7a43be4e6b952be681ce06774b92e11a99815537298f6214c026a383#vout=0)
-2. Intermediate transation whose output was used as input 1 of the claim transaction - [d59dd6bcc254c2208ba84d5ee254fa88dfb0bb3c5131ed573541345a673b3c46](https://mempool.space/tx/d59dd6bcc254c2208ba84d5ee254fa88dfb0bb3c5131ed573541345a673b3c46)
-3. Claim transaction - [dcb2eadfc77ede56fe96fc6391b771eb4b92667054c160634ad393427911cd67](https://mempool.space/tx/dcb2eadfc77ede56fe96fc6391b771eb4b92667054c160634ad393427911cd67)
+An example for mining the PoW locked output. We will use the output created above and go through the steps required to mine it.
+
+UTXO of the PoW locked output: [2c6747829c435da3be23ba350c7d5eab5b9fb8717de2613973191305779e3075:0](https://mempool.space/testnet4/tx/2c6747829c435da3be23ba350c7d5eab5b9fb8717de2613973191305779e3075#vout=0)
+
+We will also need a UTXO that we control, to be used in the intermediate transaction that we will use for grinding SIGHASH_NONE. 
+
+UTXO for the intermediate transaction: [63e0fcd8c7a828dc979da397fa82fdd7d8e49b9d5a693273fbd98813f254299c:1](https://mempool.space/testnet4/tx/63e0fcd8c7a828dc979da397fa82fdd7d8e49b9d5a693273fbd98813f254299c#vout=1)
+
+##### Preparation
+
+Convert the **x** pairs to intervals of transaction hash, the interval is always in the form **Cn** = \[**xnb**, **xna**+2^246) ∪ \[**xnb**+(**n** div 2)+1, **xna**+2^246+(**n** div 2)+1)
+
+C1 = \[0x000f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164, 0x0040000000000000000000000000000000000000000000000000000000000001) ∪ \[0x800f1504f7dd7ed3811e84e2e680f49644be44caf5d6c9870949b08ac3c7e205, 0x803fffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a2)\
+C2 = \[0x010f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164, 0x0140000000000000000000000000000000000000000000000000000000000001) ∪ \[0x810f1504f7dd7ed3811e84e2e680f49644be44caf5d6c9870949b08ac3c7e205, 0x813fffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a2)\
+C3 = \[0x020f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164, 0x0240000000000000000000000000000000000000000000000000000000000001) ∪ \[0x820f1504f7dd7ed3811e84e2e680f49644be44caf5d6c9870949b08ac3c7e205, 0x823fffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a2)\
+C4 = \[0x030f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164, 0x0340000000000000000000000000000000000000000000000000000000000001) ∪ \[0x830f1504f7dd7ed3811e84e2e680f49644be44caf5d6c9870949b08ac3c7e205, 0x833fffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a2)\
+C5 = \[0x040f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164, 0x0440000000000000000000000000000000000000000000000000000000000001) ∪ \[0x840f1504f7dd7ed3811e84e2e680f49644be44caf5d6c9870949b08ac3c7e205, 0x843fffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a2)\
+C6 = \[0x050f1504f7dd7ed3811e84e2e680f496e766d6579e327969296081445bacc164, 0x0540000000000000000000000000000000000000000000000000000000000001) ∪ \[0x850f1504f7dd7ed3811e84e2e680f49644be44caf5d6c9870949b08ac3c7e205, 0x853fffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a2)
+
+##### Grinding
+
+###### SIGHASH_NONE \| ANYONECANPAY
+
+We can vary this sighash by incrementing the nSequence of the input 0 (this can go from 0 to 2^31) & timelock of the transaction (this can go from 500000000 to 1700000000).
+
+Using locktime=500000000 & input 0's nSequence=11 produces a valid sighash=0x032c7a1ced956bf3847a1063ac6e283e06554142ead66b194d3478ab4e46845a which is contained in the interval **C4**.
+
+###### SIGHASH_NONE
+
+For this we need to create intermediate transaction using the intermediate UTXO provided, such that we can vary its txId by changing intermediate tx's locktime & nSequence fields.
+
+We first create an ephemeral key **de**=0x3f45d97dc47b0c2eefb61d94b6855a58247f8fdb256048d5ab65e71273031893 that will be used for the output of the intermediate tx, with corresponding public key **Pe**=034d1f488236a356bbc6ddcdaaaed2472af502b0206fd3b036c82f656aa30c7bb7 and P2WPKH locking script 0014366bf8aaf0e672d2c28b2a4e1c5d6a6dcb1048f6.
+
+We create an intermediate transaction like so:
+
+| Inputs                                                             | Outputs                                                                                |
+|--------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| 63e0fcd8c7a828dc979da397fa82fdd7d8e49b9d5a693273fbd98813f254299c:1 | P2WPKH(034d1f488236a356bbc6ddcdaaaed2472af502b0206fd3b036c82f656aa30c7bb7): 18190 sats |
+
+Which is then used in the claim transaction like so:
+
+| Inputs                                                             |
+|--------------------------------------------------------------------|
+| 2c6747829c435da3be23ba350c7d5eab5b9fb8717de2613973191305779e3075:0 |
+| <intermediate txId>:0                                              |
+
+We can now start incrementing nSequence of the input 0 of the intermediate transaction (this can go from 0 to 2^31) & timelock of the intermediate transaction (this can go from 500000000 to 1700000000).
+
+Using locktime=500000000 & input 0's nSequence=200 produces an intermediate transaction txId=23990f08e0e7cb6e22ea1837241d5884c84d2398a82f5469e63d022ce215e84f, which when used as input 1 of the claim transaction creates a valid sighash=0x051c2fb4ae682f4598c45146ec16fcd1944fa7b674571dbb4f3ba9c85c79bd6f which is contained in the interval **C6**.
+
+###### SIGHASH\_SINGLE and SIGHASH\_SINGLE \| ANYONECANPAY
+
+We need to grind these 2 together, since we have no way to influence one without also changing the other. We do this by changing the output 0's script. To do this we could simply generate random private keys & P2WPKH locking scripts to them, however this means generating public keys from private keys which is orders of magnitude slow than hashing. We will therefore use a P2WSH script which includes the nonce and then simply drops it from the stack & then verifies the signature. The redeem script looks like this:
+
+```
+<nonce> OP_DROP <public key> OP_CHECKSIGVERIFY OP_1
+```
+
+Using this we can simply change the nonce to change the script hash and influence the P2WSH output script, while keeping the same public key.
+
+We create a random claim key **dc**=0x6484e2ecd66d7b834272e26a82aa9115b7b0591dca5b6b17ca316d58fe00a297, with its corresponding public key **Pc**=02b0db6b93ed9284dc957718faf3f1464cf2a47f35c12ddc1783cbebed3952d3dbad.
+
+Now we can start incrementing the nonce in the P2WSH output script.
+
+Using nonce=44966 we get the following P2WSH redeem script:
+
+```
+afa6 OP_DROP 02b0db6b93ed9284dc957718faf3f1464cf2a47f35c12ddc1783cbebed3952d3dbad OP_CHECKSIGVERIFY OP_1
+```
+
+Which translates to the output script 00200369b6c884a12874f75c3d1285ca2a7119f0d977e0c60f84034b31291c6ce9fe and produces a valid sighashes - sighash(SIGHASH\_SINGLE)=0x012a4533d9bbc900bf5757dcc6b2f3aa8925a2fbc42708afe22b0921124f62a2 which is contained in the interval **C2** & sighash(SIGHASH\_SINGLE \| ANYONECANPAY)=0x841d8ccc1fa672da928aae66b5a1653a227abc1fedab8a55d1c0300cf4337a33 which is contained in the interval **C5**
+
+###### SIGHASH\_ALL and SIGHASH\_ALL \| ANYONECANPAY
+
+We again need to grind these 2 together, since we have no way to influence one without also changing the other. We do this by changing output 1's output script, here we can simply use OP_RETURN.
+
+```
+OP_RETURN <nonce>
+```
+
+Now we can start incrementing the nonce in the OP_RETURN output.
+
+Using nonce=68976 we get valid sighashes - sighash(SIGHASH\_ALL)=0x022a721e26c9115172fc219abde406bab532df328fc83c16e8820a82f9bada6a which is contained in the interval **C3** & sighash(SIGHASH\_ALL \| ANYONECANPAY)=0x803fcf5814aa36a5d6488fdf26d949b5871f29764b20842170cbbccce4eb15e4 which is contained in **C1**
+
+##### Transactions
+
+We now have a valid set of transactions
+
+###### Intermediate transaction
+
+locktime=500000000
+
+| Inputs                                                                             | Outputs                                                                                |
+|------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| 63e0fcd8c7a828dc979da397fa82fdd7d8e49b9d5a693273fbd98813f254299c:1, nSequence: 200 | P2WPKH(034d1f488236a356bbc6ddcdaaaed2472af502b0206fd3b036c82f656aa30c7bb7): 18190 sats |
+
+txId = [23990f08e0e7cb6e22ea1837241d5884c84d2398a82f5469e63d022ce215e84f](https://mempool.space/testnet4/tx/23990f08e0e7cb6e22ea1837241d5884c84d2398a82f5469e63d022ce215e84f)
+
+###### Claim transaction
+
+locktime=500000000
+
+| Inputs                                                                           | Outputs                                                                                                                   |
+|----------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| 2c6747829c435da3be23ba350c7d5eab5b9fb8717de2613973191305779e3075:0, nSequence=11 | P2WSH(afa6 OP_DROP 02b0db6b93ed9284dc957718faf3f1464cf2a47f35c12ddc1783cbebed3952d3db OP_CHECKSIGVERIFY OP_1): 18690 sats |
+| 23990f08e0e7cb6e22ea1837241d5884c84d2398a82f5469e63d022ce215e84f:0, nSequence=0  | OP_RETURN 010d70: 0 sats                                                                                                  |
+
+txId=[4017bedd84d88658291797d8cd9751fa20fa1216b1cf34cf808331c4522c66b3](https://mempool.space/testnet4/tx/4017bedd84d88658291797d8cd9751fa20fa1216b1cf34cf808331c4522c66b3)
+
+We produce valid signatures by using the corresponding intervals & their private keys:
+
+1. Interval C1 was hit by SIGHASH\_ALL \| ANYONECANPAY, therefore we take private keys **d1a** & **d1b**, and sign the transaction with SIGHASH\_ALL \| ANYONECANPAY by them.
+2. Interval C2 was hit by SIGHASH\_SINGLE, therefore we take private keys **d2a** & **d2b**, and sign the transaction with SIGHASH\_SINGLE by them.
+3. Interval C3 was hit by SIGHASH\_ALL, therefore we take private keys **d3a** & **d3b**, and sign the transaction with SIGHASH\_ALL by them.
+4. Interval C4 was hit by SIGHASH\_NONE \| ANYONECANPAY, therefore we take private keys **d4a** & **d4b**, and sign the transaction with SIGHASH\_NONE \| ANYONECANPAY by them.
+5. Interval C5 was hit by SIGHASH\_SINGLE \| ANYONECANPAY, therefore we take private keys **d5a** & **d5b**, and sign the transaction with SIGHASH\_SINGLE \| ANYONECANPAY by them.
+6. Interval C6 was hit by SIGHASH\_NONE, therefore we take private keys **d6a** & **d6b**, and sign the transaction with SIGHASH\_NONE by them.
+
+###### Spend transaction
+
+Locktime or nSequences are not important here 
+
+| Inputs                                                             | Outputs                                                |
+|--------------------------------------------------------------------|--------------------------------------------------------|
+| 4017bedd84d88658291797d8cd9751fa20fa1216b1cf34cf808331c4522c66b3:0 | tb1qcjrfydsykze2htqcp6thau3v7nk5hndrsywwv6: 18550 sats |
+
+txId=[921ba28a5f30060e8771efb9b47e83fd3d36d9f69948af2d225760a269675fca](https://mempool.space/testnet4/tx/921ba28a5f30060e8771efb9b47e83fd3d36d9f69948af2d225760a269675fca)
 
 ### Edge cases
 
