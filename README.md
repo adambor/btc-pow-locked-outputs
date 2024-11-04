@@ -245,7 +245,7 @@ Which is then used in the claim transaction like so:
 | Inputs                                                             |
 |--------------------------------------------------------------------|
 | 2c6747829c435da3be23ba350c7d5eab5b9fb8717de2613973191305779e3075:0 |
-| <intermediate txId>:0                                              |
+| \<intermediate txId\>:0                                              |
 
 We can now start incrementing nSequence of the input 0 of the intermediate transaction (this can go from 0 to 2^31) & timelock of the intermediate transaction (this can go from 500000000 to 1700000000).
 
